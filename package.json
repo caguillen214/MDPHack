@@ -1,0 +1,26 @@
+{
+  "name": "mdphack",
+  "version": "1.0.0",
+  "description": "Telemed Response Urgency Scheduling Triage",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/caguillen214/MDPHack.git"
+  },
+  "keywords": [
+    "Telemed",
+    "Response",
+    "Urgency",
+    "Scheduling",
+    "Triage"
+  ],
+  "author": "Carlos Guillen, Brian Vodicka, Matthew Shin, Jason Roh",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/caguillen214/MDPHack/issues"
+  },
+  "homepage": "https://github.com/caguillen214/MDPHack#readme"
+}
