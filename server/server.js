@@ -9,6 +9,8 @@ var app = express();
 app.use(bodyParser.json()); // for parsing application/json
 app.use(bodyParser.urlencoded({ extended: true })); // for parsing application/x-www-form-urlencoded
 
+var hasCalled = false;
+
 app.use(function(req, res, next) {
    res.header("Access-Control-Allow-Origin", "*");
    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
@@ -20,6 +22,16 @@ app.use(function(req, res, next) {
     return next();
   }
 });
+
+app.get('/call-doctor', function(req,res){
+  hasCalled = !hasCalled;
+  res.send('Doctor Called');
+});
+
+app.get('/check-call', function(req,res){
+  res.send(hasCalled);
+});
+
 
 app.get('/test', function(req, res){
   res.send('Test Succeeded');
