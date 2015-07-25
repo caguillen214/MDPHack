@@ -4,6 +4,8 @@ var express = require('express');
 var http = require('http');
 var bodyParser = require('body-parser');
 
+var schedule = require('../api/schedule')
+
 var app = express();
 
 app.use(bodyParser.json()); // for parsing application/json
@@ -36,6 +38,11 @@ app.get('/check-call', function(req,res){
 app.get('/test', function(req, res){
   res.send('Test Succeeded');
 });
+
+app.get('/schedule/findAppt', function(req, res){
+  schedule.findAppt(req.query, res);
+})
+
 
 app.listen(3000);
 
