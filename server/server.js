@@ -25,18 +25,6 @@ app.get('/test', function(req, res){
   res.send('Test Succeeded');
 });
 
-app.post('/get-file-data', function(req, res){
-  if(req.body && req.body.fileName && req.body.projectName) {
-    var path = './projects/'+req.body.projectName+'/file-jsons/'+req.body.fileName+'.json';
-    var directivesPath = './projects/'+req.body.projectName+'/file-directives/'+req.body.fileName+'.json';
-    var data = JSON.parse(fs.readFileSync(path, 'utf8')) || {};
-    var directives = JSON.parse(fs.readFileSync(directivesPath, 'utf8')) || {};
-    res.json({data:data, directives:directives});
-  }
-});
-
-
-
 app.listen(3000);
 
 console.log('TRUST API ready.');
