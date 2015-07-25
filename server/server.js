@@ -4,7 +4,7 @@ var express = require('express');
 var http = require('http');
 var bodyParser = require('body-parser');
 
-var schedule = require('./schedule')
+var schedule = require('../api/schedule')
 
 var app = express();
 
