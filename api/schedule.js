@@ -9,21 +9,31 @@ function findAppt(query, res){
 	score = query.score;
 	days  = query.days;
 
-	connection = athenaAPI.Connection(version, key, secret, practiceid);
+
+
+	api = new athenaAPI.Connection(version, key, secret, practiceid);
 	//connection.authenticate()
 
 	path = 'departments';
+		
+	// Make Patient
 	
-	console.log(connection);
-	emit = connection.GET(path, {});
+	options = {}
+	emit = api.GET(path, {});
 	emit.on("done", function(output){
 		console.log(output);
 	});
+
+
 	//Get open appts
 	//Schedule best appointment
 	//return appt
 
-	res.json(query);
+	res.json({"hospital" : "Sample",
+				"date"  : "7/26/15",
+				"time"  : "15:30",
+				"phone" : "1234567890"});
+
 }
 
 function path_join() {
