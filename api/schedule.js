@@ -27,15 +27,18 @@ function findAppt(query, res){
 
 	api.GET("/patients", {params: patientData})
 		.on("done", function(output){
-			patient = output;
-			console.log(patient)
-			if(!patient["totalcount"])
+			if(!output["totalcount"])
 				signal.emit("new", patient)
 			else
-				signal.emit("findappt", patient, patient["patients"][0]["patientid"])
+				patient = output["patients"][0];
+				signal.emit("getprov", patient)
 		}).on("error", log_error);
 
 	signal.on("new", function(patient){
+		
+		console.log("------EVENT-------")
+		console.log("new")
+
 		patientData["departmentid"] = 1;
 		console.log(patientData);
 
@@ -50,73 +53,96 @@ function findAppt(query, res){
 	});
 
 	signal.on("getpat", function(pid){
+		console.log("------EVENT-------")
+		console.log("getpat")
 
 		api.GET("/patients/" + pid, {})
-		.on("done", function(output){
-			patient = output;
-			console.log(patient)
-			signal.emit("findappt", patient, patient["patients"][0]["patientid"])
-		}).on("error", log_error);
+			.on("done", function(output){
+				patient = output["patients"][0];
+				console.log(patient)
+				signal.emit("getprov", patient)
+			}).on("error", log_error);
 
+	});
+
+	signal.on("getprov", function(patient){
+		console.log("------EVENT-------")
+		console.log("getprov")
+
+		api.GET("/providers")
+			.on("done", function(output){
+				prov = output["providers"]
+				var genprac = []
+				for(var i in prov){
+					if(prov["speciality"] == "General Practice")
+						genprac.push({"name" : prov["displayname"],
+										"provid" : prov["providerid"]})
+				}
+			}).on("error", log_error)
+		signal.emit("finddept", patient, genprac)
+	}); 
+
+	signal.on("getdept", function(patient, genprac){
+		console.log("------EVENT-------")
+		console.log("getdept")
+
+		api.GET("/departments")
 	});
 
 	signal.on("findappt", function(patient, pid){
+		console.log("------EVENT-------")
+		console.log("findappt")
+
 		pScore = flow * score + (1 - flow) * scoreFromDays(days)
 		today = new Date()
 		endDate = new Date()
-		endDate.setDate(endDate.getDate() + 21);
+		endDate.setDate(endDate.getDate() + 22);
 
-		dtokens = endDate.toISOString().split("-")
+		dtokens = endDate.toISOString().substr(0,10).split("-")
 		endDateString = [dtokens[1], dtokens[2], dtokens[0]].join("/")
 		console.log(endDateString)
-
-		console.log(patient["departmentid"])
-		
 		apptDetails = {"appointmenttypeid" : 8,
 						"departmentid" : patient["departmentid"],
 						"providerid" : 71,
-						"enddate" : endDateString}
+						"enddate" : endDateString,
+						"limit" : 5000,}
 
 		api.GET("/appointments/open", {params: apptDetails})
 			.on('done', function(output){
-				console.log(output)
+				var N = output["totalcount"]
+				var scheduledAppts = {}
+				for(var i = 0; i < N; i++){
+					appt = output["appointments"][i]
+					dateTokens = appt["date"].split("/")
+					apptDate = new Date(dateTokens[2], parseInt(dateTokens[0]) - 1, dateTokens[1])
+					
+					dt = Math.floor((apptDate - today) / (86400000))
+					at = scoreFromApptFlow(dt, flow)
+					if(at < pScore){
+						scheduledAppts = output["appointments"].slice(i, Math.min(i + 3, N))
+						break;
+					}
+				}
+
+				signal.emit("getinfo", scheduledAppts)
 			});
-		signal.emit("return", pScore)
-		
 	});
 
+	signal.on("getinfo", function(appts){
+		console.log(appts)
+		signal.emit("return", 10)
+	})
 
-
-	//});
-
-	//  if not Make Patient
-	/*
-	options = {}
-	emit = api.GET("", {});
-	emit.on("done", function(output){
-		console.log(output);
-	});
-	*/
-
-	//Get open appts
-	//Schedule best appointment
-	//return appt
-	/*
-	api.status.on('error', function(error) {
-		console.log(error)
-	});
-	*/
 	signal.on("return", function(pScore){
 		res.json({"hospital" : "Sample",
 					"date"  : "7/26/15",
 					"time"  : "15:30",
-					"phone" : "1234567890",
-					"score" : pScore});
+					"phone" : "1234567890",});
 	});
 
 }
 
-function path_join() {
+function pathJoin() {
 	// trim slashes from arguments, prefix a slash to the beginning of each, re-join (ignores empty parameters)
 	var args = Array.prototype.slice.call(arguments, 0)
 	var nonempty = args.filter(function(arg, idx, arr) {
@@ -128,7 +154,7 @@ function path_join() {
 	return trimmed.join('')
 }
 
-function log_error(error) {
+function logError(error) {
 	console.log(error)
 	console.log(error.cause)
 }
