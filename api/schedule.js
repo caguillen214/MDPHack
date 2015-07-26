@@ -29,10 +29,12 @@ function findAppt(query, res){
 		.on("done", function(output){
 			if(!output["totalcount"])
 				signal.emit("new", patient)
-			else
+			else{
+				console.log("Patient already exists")
 				patient = output["patients"][0];
 				signal.emit("getprov", patient)
-		}).on("error", log_error);
+			}
+		}).on("error", logError);
 
 	signal.on("new", function(patient){
 		
@@ -40,28 +42,26 @@ function findAppt(query, res){
 		console.log("new")
 
 		patientData["departmentid"] = 1;
-		console.log(patientData);
 
 		api.POST('/patients', {params: patientData})
 			.on('done', function(output){
-				console.log(output);
 				var patient = output[0];
 				var pid = patient['patientid'];
-				console.log(new_patient_id);
+				console.log("Created Patient ID: " + pid);
 				signal.emit("getpat", pid)
-			}).on("error", log_error);
+			}).on("error", logError);
 	});
 
 	signal.on("getpat", function(pid){
 		console.log("------EVENT-------")
 		console.log("getpat")
 
-		api.GET("/patients/" + pid, {})
+		api.GET("/patients/" + pid)
 			.on("done", function(output){
-				patient = output["patients"][0];
-				console.log(patient)
+				patient = output[0];
+				//console.log("Patient Found: " + patient)
 				signal.emit("getprov", patient)
-			}).on("error", log_error);
+			}).on("error", logError);
 
 	});
 
@@ -69,17 +69,19 @@ function findAppt(query, res){
 		console.log("------EVENT-------")
 		console.log("getprov")
 
+		var genprac = []
 		api.GET("/providers")
 			.on("done", function(output){
 				prov = output["providers"]
-				var genprac = []
-				for(var i in prov){
-					if(prov["speciality"] == "General Practice")
-						genprac.push({"name" : prov["displayname"],
-										"provid" : prov["providerid"]})
+				for(var i = 0; i < output["totalcount"]; i++){
+					if(prov[i]["specialty"] == "General Practice"){
+						genprac.push({"name" : prov[i]["displayname"],
+										"provid" : prov[i]["providerid"]})
+					}
 				}
-			}).on("error", log_error)
-		signal.emit("finddept", patient, genprac)
+				signal.emit("getdept", patient, genprac)
+			}).on("error", logError)
+		
 	}); 
 
 	signal.on("getdept", function(patient, genprac){
@@ -87,57 +89,118 @@ function findAppt(query, res){
 		console.log("getdept")
 
 		api.GET("/departments")
+			.on("done", function(output){
+				deptInfo = []
+				depts = output["departments"]
+				for(var i = 0; i < depts.length; i++){
+					dept = depts[i]
+					data = {"address" : dept["city"] + ", " + dept["state"],
+							"deptname" : dept["providergroupname"],
+							"deptid" : dept["departmentid"]}
+					if("address" in dept){
+						data["address"] = dept["address"] + "\\n" + data["address"]
+					}
+					deptInfo.push(data)
+				}
+				signal.emit("findappt", patient, deptInfo, genprac)
+			})
 	});
 
-	signal.on("findappt", function(patient, pid){
+	signal.on("findappt", function(patient, deptInfo, genprac){
 		console.log("------EVENT-------")
 		console.log("findappt")
 
-		pScore = flow * score + (1 - flow) * scoreFromDays(days)
-		today = new Date()
 		endDate = new Date()
-		endDate.setDate(endDate.getDate() + 22);
+		endDate.setDate(endDate.getDate() + 22)
 
 		dtokens = endDate.toISOString().substr(0,10).split("-")
 		endDateString = [dtokens[1], dtokens[2], dtokens[0]].join("/")
-		console.log(endDateString)
+
 		apptDetails = {"appointmenttypeid" : 8,
 						"departmentid" : patient["departmentid"],
-						"providerid" : 71,
 						"enddate" : endDateString,
 						"limit" : 5000,}
 
-		api.GET("/appointments/open", {params: apptDetails})
-			.on('done', function(output){
-				var N = output["totalcount"]
-				var scheduledAppts = {}
-				for(var i = 0; i < N; i++){
-					appt = output["appointments"][i]
-					dateTokens = appt["date"].split("/")
-					apptDate = new Date(dateTokens[2], parseInt(dateTokens[0]) - 1, dateTokens[1])
-					
-					dt = Math.floor((apptDate - today) / (86400000))
-					at = scoreFromApptFlow(dt, flow)
-					if(at < pScore){
-						scheduledAppts = output["appointments"].slice(i, Math.min(i + 3, N))
-						break;
-					}
-				}
-
-				signal.emit("getinfo", scheduledAppts)
-			});
+		signal.emit("loop", 0, genprac.length, apptDetails, genprac, deptInfo, [])
 	});
 
-	signal.on("getinfo", function(appts){
-		console.log(appts)
-		signal.emit("return", 10)
+	signal.on("loop", function(i, max, apptDetails, genprac, deptInfo, openSlots){
+		if(i >= max){
+			signal.emit("calcscore", openSlots, genprac, deptInfo)
+		}
+		else{
+			apptDetails["providerid"] = genprac[i]["provid"]
+			api.GET("/appointments/open", {params: apptDetails})
+				.on('done', function(output){
+					//console.log(output)
+					Array.prototype.push.apply(openSlots, output["appointments"])
+					signal.emit("loop", i + 1, max, apptDetails, genprac, deptInfo, openSlots)
+				});
+		}
+		//console.log(openSlots.length)
+	});
+
+	signal.on("calcscore", function(openSlots, genprac, deptInfo){
+		console.log("------EVENT-------")
+		console.log("calcscore")
+
+		pScore = flow * score + (1 - flow) * scoreFromDays(days)
+		console.log("Patient Score: " + pScore)
+		today = new Date()
+
+		N = openSlots.length
+		var scheduledAppts = {}
+		for(var i = 0; i < N; i++){
+			appt = openSlots[i]
+			dateTokens = appt["date"].split("/")
+			apptDate = new Date(dateTokens[2], parseInt(dateTokens[0]) - 1, dateTokens[1])
+					
+			dt = Math.floor((apptDate - today) / (86400000))
+			at = scoreFromApptFlow(dt, flow)
+			if(at < pScore){
+				scheduledAppts = openSlots.slice(i, Math.min(i + 3, N))
+				break;
+			}
+		}
+		results = []
+
+		for(var i = 0; i < 3; i++){
+			result = {"date" : scheduledAppts[i]["date"],
+					"time" : scheduledAppts[i]["starttime"]}
+
+			for(var j = 0; j < genprac.length; j++){
+				if(genprac[j]["provid"] == scheduledAppts[i]["providerid"]){
+					result["provider"] = genprac[j]["name"]
+					break
+				}
+			}
+			for(var j = 0; j < deptInfo.length; j++){
+				//console.log(deptInfo[j])
+				//console.log(scheduledAppts[i]["departmentid"])
+				if(deptInfo[j]["deptid"] == scheduledAppts[i]["departmentid"]){
+					result["deptname"] = deptInfo[j]["deptname"]
+					result["location"] = deptInfo[j]["address"]
+					break
+				}
+			}
+
+			results.push(result)
+		}
+		signal.emit("return", results)
 	})
 
-	signal.on("return", function(pScore){
+
+	signal.on("return", function(results){
+		console.log("------EVENT-------")
+		console.log("return")
+
+		res.json(results)
+		/*
 		res.json({"hospital" : "Sample",
 					"date"  : "7/26/15",
 					"time"  : "15:30",
 					"phone" : "1234567890",});
+		*/
 	});
 
 }
