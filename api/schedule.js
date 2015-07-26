@@ -1,5 +1,6 @@
 var athenaAPI = require("./athenahealthapi")
 var events = require("events")
+var _ = require("underscore")
 
 var key = 'mkq266qbu4zar3wp4kkmuadf'
 var secret = 'zDgxN8ZXCW5b3r2'
@@ -144,9 +145,26 @@ function findAppt(query, res){
 		console.log("------EVENT-------")
 		console.log("calcscore")
 
+		// Simulate Emergency Situation
+		sampleIdx = []
+		sampleSize = 30
+		sampleRange = openSlots.length
+		sample = []
+		for(i = 0; i < sampleSize; i++){
+			sampleIdx.push(Math.floor(Math.random() * sampleRange))
+		}
+		sampleIdx.sort(function(a, b){return a-b})
+		console.log(sampleIdx)
+		for(i = 0; i < sampleSize; i++){
+			sample.push(openSlots[sampleIdx[i]])
+		}
+		openSlots = sample
+		//openSlots = _.sample(openSlots, 30)
+
 		pScore = flow * score + (1 - flow) * scoreFromDays(days)
 		console.log("Patient Score: " + pScore)
 		today = new Date()
+
 
 		N = openSlots.length
 		var scheduledAppts = {}
@@ -163,6 +181,9 @@ function findAppt(query, res){
 			}
 		}
 		results = []
+		if(scheduledAppts.length < 3){
+			scheduledAppts = openSlots.slice(N-3, N)
+		}
 
 		for(var i = 0; i < 3; i++){
 			result = {"date" : scheduledAppts[i]["date"],
