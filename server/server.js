@@ -4,7 +4,9 @@ var express = require('express');
 var http = require('http');
 var bodyParser = require('body-parser');
 
-var schedule = require('../api/schedule')
+var schedule = require('../api/schedule');
+var symptoms = require('../api/symptoms');
+
 
 var app = express();
 
@@ -30,10 +32,23 @@ app.get('/call-doctor', function(req,res){
   res.send('Doctor Called');
 });
 
+app.get('/symptoms-typeahead', function(req, res) {
+  var q = req.query.q;
+  var matches = symptoms.getSymptomsTypeahead(q);
+  res.json(matches);
+});
+
+app.get('/symptom-average', function(req,res) {
+  console.log(req.query.s1);
+  console.log(req.query.s2);
+  var avg = symptoms.symptomAverage(req.query.s1, req.query.s2, req.query.s3);
+  avg = avg > 9 ? 9 : avg;
+  res.json({average: avg});
+});
+
 app.get('/check-call', function(req,res){
   res.send(hasCalled);
 });
-
 
 app.get('/test', function(req, res){
   res.send('Test Succeeded');
