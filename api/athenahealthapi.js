@@ -366,7 +366,6 @@ function Connection(version, key, secret, practiceid) {
 		return _token
 	}
 
-	console.log(__construct(this))
 	return __construct(this)
 }
 
